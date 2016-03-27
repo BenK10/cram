@@ -5,13 +5,41 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
-#include <list>
-#include <set>
 
 
 
 using namespace std;
 
+//node class. Immutable but move-assignable and move-constructible. The latter two are required for make_heap used by queue
+//they become necessary because of the const members
+class HuffTreeNode
+{
+    public:
+    const int freq{0};
+    const HuffTreeNode* left{nullptr};
+    const HuffTreeNode* right{nullptr};
+
+    HuffTreeNode(int freq, HuffTreeNode* left, HuffTreeNode* right) : freq{freq}, left{left}, right{right}
+    {}
+
+    HuffTreeNode& operator=(const HuffTreeNode&)
+    {
+        //heap wants the items to be assignable
+    }
+};
+
+class HuffTreeLeafNode : public HuffTreeNode
+{
+    public:
+    const char data=0x00;
+
+    HuffTreeLeafNode(char data, int freq, HuffTreeNode* left, HuffTreeNode* right)
+        : HuffTreeNode(freq, left, right), data(data)
+    {}
+};
+
+//actually, the class is overkill. The advantage of the struct is that I don't need to define
+//move-assign and copy construct to make it work with the queue
 struct huffnode
 {
     char data;
@@ -23,31 +51,29 @@ struct huffnode
     {}
 };
 
-//traverse tree to get codebook
-void get_code(huffnode* node, huffnode* root, unordered_map<char, vector<bool>>& codebook, vector<bool> code, bool bit=0)
+//helper
+void get_code(huffnode* node, unordered_map<char, vector<bool>>& codebook, vector<bool> code)
 {
-    static set<huffnode*> visited;
+    //cout<<"entering getcode"<<endl; //test
     if(node==nullptr) return;
+    cout<<node->data<<" "<<node->freq<<" "<<endl;//test
 
     if(node->left==nullptr && node->right==nullptr)
-    {
-        if(node!=root) code.push_back(bit);
-        codebook.insert(make_pair(node->data, code));
-        return;
-    }
-
-    if(node->right != nullptr)
-    {
-        if(node!=root && visited.find(node)==visited.end()) code.push_back(bit);
-        visited.insert(node);
-        get_code(node->right, root, codebook, code, 1);
-    }
+        {codebook.insert(make_pair(node->data, code)); return;}
 
     if(node->left != nullptr)
     {
-        if(node!=root && visited.find(node)==visited.end()) code.push_back(bit);
-        visited.insert(node);
-;       get_code(node->left, root, codebook, code, 0);
+        code.push_back(0);
+        get_code(node->left, codebook, code);
+        cout<<"going left"<<endl;//test
+    }
+
+
+    if(node->right != nullptr)
+    {
+        code.push_back(1);
+        get_code(node->right, codebook, code);
+        cout<<"going right"<<endl;//test
     }
 
 }
@@ -55,7 +81,7 @@ void get_code(huffnode* node, huffnode* root, unordered_map<char, vector<bool>>&
 void build_codebook(huffnode* root, unordered_map<char, vector<bool>>& codebook)
 {
     vector<bool> code;
-    get_code(root, root, codebook, code);
+    get_code(root, codebook, code);
 }
 
 vector<int> get_histogram(vector<char> bytes)
@@ -68,7 +94,7 @@ vector<int> get_histogram(vector<char> bytes)
     return histogram;
 }
 
-//"insane_coder"'s file read, benchmarked to be the fastest C++ way
+//insane_coder's file read, benchmarked to be the fastest C++ way
 //see http://insanecoding.blogspot.it/2011/11/how-to-read-in-file-in-c.html
 vector<char> get_contents(string filename)
 {
@@ -86,19 +112,32 @@ vector<char> get_contents(string filename)
     throw(errno);
 }
 
+//the idiomatic but slower way:
+/*
+vector<char> container( (std::istreambuf_iterator<char>( in )),
+                         (std::istreambuf_iterator<char>()) );
+See James Kanze's post about the nuances of this:
+http://stackoverflow.com/questions/7796857/streaming-into-vector
+
+the above functions don't work using vector<bool>. So read as chars (bytes)
+and use vector<bool> to represent the bitstrings for Huffman table.
+*/
+
 int main()
 {
     const string test_text = "example.txt";
+  //  const string test_png = "cpp.png";
 
+    //test
    vector<char> v1 = get_contents(test_text);
-   vector<int> histogram = get_histogram(v1);
-   list<huffnode> nodes;
+  // vector<char> v2 = get_contents(test_png);
+  vector<int> histogram = get_histogram(v1);
 
    //queue with lowest frequency having highest priority
    auto comp = [](huffnode n1, huffnode n2){return n1.freq > n2.freq;};
    priority_queue<huffnode, vector<huffnode>, decltype(comp)> q(comp);
 
-   unordered_map<char, vector<bool>> codebook(256);
+   unordered_map<char, vector<bool>> codebook(256); //vector<bool> instead of bitset bc bitset is fixed length
 
    //populate queue
    for(int i=0; i<histogram.size(); ++i)
@@ -107,16 +146,25 @@ int main()
        q.push(huffnode((char)i, histogram[i], nullptr, nullptr));
    }
 
+   for(int val : histogram)
+    cout<<val<<" ";
+
+    cout<<"q populated"<<endl; //test
+
     //build huffman tree
     while(q.size() > 1)
     {
-        huffnode* n1 = new huffnode(q.top().data, q.top().freq, q.top().left, q.top().right);
+        huffnode n1 = q.top();
         q.pop();
-        huffnode* n2 = new huffnode(q.top().data, q.top().freq, q.top().left, q.top().right);
+        huffnode n2 = q.top();
         q.pop();
 
-        q.push(huffnode((char)0, n1->freq + n2->freq, n1, n2));
+        q.push(huffnode((char)0, n1.freq+n2.freq, &n1, &n2));
+
+        cout<<"node pushed"<<endl;//test
     }
+
+    cout<<"tree built"<<endl; //test
 
     //now only the root remains
     huffnode root = q.top();
@@ -124,19 +172,16 @@ int main()
     //build the codebook - traverse huff tree
     build_codebook(&root, codebook);
 
-    //encode
+    cout<<"codebook built"<<endl; //test;
 
-
-    /*
-    //check codebook TEST
     for(const auto entry : codebook)
     {
         cout<<entry.first<<" ";
         for(auto itr = entry.second.begin(); itr!= entry.second.end(); ++itr)
             cout<<*itr;
-        cout<<" ";
+        cout<<"";
         cout<<entry.second.size()<<endl;
-    }*/
+    }
 
     return 0;
 }
