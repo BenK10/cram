@@ -86,6 +86,23 @@ vector<char> get_contents(string filename)
     throw(errno);
 }
 
+char pack_bools(vector<bool>& bits, int index)
+{
+    char result = (char)0;
+    char mask = (char)0;
+    for(int i=index; i<bits.size(); ++i)
+    {
+        if(i%8==0) break;
+        if(bits[i]==true)
+            mask=(char)1;
+        else mask=(char)0;
+
+        result = result | mask;
+        result <<= result;
+    }
+    return result;
+}
+
 int main()
 {
     const string test_text = "example.txt";
@@ -125,7 +142,34 @@ int main()
     build_codebook(&root, codebook);
 
     //encode
+    vector<bool> compressed;
+    compressed.reserve(v1.size()*4);
+    for(char c : v1)
+    {
+        vector<bool> code = codebook.find(c)->second;
+        for(auto bit : code)
+            compressed.push_back(bit);
+    }
 
+    //test
+    for(auto bit : compressed)
+        cout<<bit;
+
+    //pack bools into chars
+    vector<char> output;
+    for(int i=0; i<compressed.size(); i+=8)
+        output.push_back(pack_bools(compressed, i));
+
+    cout<<"compressed codes bytes "<<compressed.size()<<endl;//test
+    cout<<"packed bytes "<<output.size();
+
+    //write out
+   // ofstream out("out.crm", ios::out | ios::binary);
+  //  for(auto itr = output.begin(); itr!=output.end(); ++itr)
+   //     out.write(&(*itr),1);
+
+   //decompress.
+   //TODO place in separate file, embed huffman code/tree in compressed file, embed number of valid bits in final byte
 
     return 0;
 }
