@@ -1,38 +1,36 @@
 //Cram, a simple lossless Huffman compression algorithm
 
 #include "huffman_comp.h"
+#include "io.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <exception>
 
 using namespace std;
 
-//"insane_coder"'s file read, benchmarked to be the fastest C++ way
-//see http://insanecoding.blogspot.it/2011/11/how-to-read-in-file-in-c.html
-vector<char> get_contents(string filename)
+int main(int argc, char* argv[])
 {
-    ifstream in(filename, ios::in | ios::binary);
-    if(in)
-    {
-        vector<char> contents;
-        in.seekg(0, ios::end);
-        contents.resize(in.tellg());
-        in.seekg(0, ios::beg);
-        in.read(&contents[0], contents.size());
 
-        return contents;
-    }
-    throw(errno);
-}
+   if(argc != 3)
+   {
+       cout<<"usage: cram.exe file_to_compress compressed_file";
+       return -1;
+   }
 
-int main()
-{
-    const string test_text = "example.txt";
+   string filename;
+   string compressed_filename;
+   filename = argv[1];
+   compressed_filename = argv[2];
 
-   vector<char> v1 = get_contents(test_text);
-   vector<int> histogram = get_histogram(v1);
+   vector<char> file_contents;
+   try{
+    file_contents = get_contents(filename);
+   }
+   catch(exception& e) {cerr<<e.what();}
+   vector<int> histogram = get_histogram(file_contents);
 
    //queue with lowest frequency having highest priority
    auto comp = [](huffnode n1, huffnode n2){return n1.freq > n2.freq;};
@@ -66,33 +64,24 @@ int main()
 
     //encode
     vector<bool> compressed;
-    compressed.reserve(v1.size()*4);
-    for(char c : v1)
+    compressed.reserve(file_contents.size()*4);
+    for(char c : file_contents)
     {
         vector<bool> code = codebook.find(c)->second;
         for(auto bit : code)
             compressed.push_back(bit);
     }
 
-    //test
-    for(auto bit : compressed)
-        cout<<bit;
-
     //pack bools into chars
     vector<char> output;
     for(int i=0; i<compressed.size(); i+=8)
         output.push_back(pack_bools(compressed, i));
 
-    //number of valid bits in final code byte is 8-(8*output.size - compressed.size)
-
     //write out
-    //TODO buffer it
-   // ofstream out("out.crm", ios::out | ios::binary);
-  //  for(auto itr = output.begin(); itr!=output.end(); ++itr)
-   //     out.write(&(*itr),1);
+    ofstream out(compressed_filename, ios::out | ios::binary);
+    out.write(&output[0],output.size());
 
    //decompress.
-   //TODO place in separate file, embed huffman code/tree in compressed file, embed number of valid bits in final byte
 
     return 0;
 }
