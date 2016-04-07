@@ -5,7 +5,7 @@
 #include <string>
 
 std::vector<char> get_contents(std::string filename);
-void write_out (std::vector<char> contents, std::string filename);
-
+std::vector<bool> char_to_bools(char c);
+char pack_bools(std::vector<bool>& bits, int index);
 
 #endif // IO_H_INCLUDED

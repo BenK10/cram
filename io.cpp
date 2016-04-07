@@ -1,6 +1,7 @@
 #include "io.h"
 #include <fstream>
 #include <exception>
+#include <algorithm>
 
 //"insane_coder"'s binary file read, benchmarked to be the fastest way
 //see http://insanecoding.blogspot.it/2011/11/how-to-read-in-file-in-c.html
@@ -20,7 +21,28 @@ std::vector<char> get_contents(std::string filename)
     else throw(std::exception());
 }
 
-void write_out (std::vector<char> contents, std::string filename)
+//convert a char into a vector<bool>
+std::vector<bool> char_to_bools(char c)
 {
- //TODO
+    std::vector<bool> result(8);
+    char mask = (char)1;
+    for(int i=0; i<8; ++i)
+        result[i]=((c>>(i)) & mask);
+
+    std::reverse(result.begin(), result.end());
+
+    return result;
+}
+
+//pack 8 bools into a char
+char pack_bools(std::vector<bool>& bits, int index)
+{
+    char result = (char)0;
+    char mask = (char)1;
+    for(int i=index; i<index+8; ++i)
+    {
+        result = result | ((char)bits[i] & mask);
+        if( (i+1)%8 != 0) result <<= 1; //don't shift if at end of byte
+    }
+    return result;
 }
