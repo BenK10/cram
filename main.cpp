@@ -10,7 +10,6 @@
 #include <queue>
 #include <unordered_map>
 #include <exception>
-#include <cmath>
 
 using namespace std;
 
@@ -21,13 +20,13 @@ int main(int argc, char* argv[])
    string out_filename;
    vector<char> file_contents;
 
-   if(argc != 4 || (argv[3] != "-c" && argv[3] != "-d"))
+   if(argc != 4 || (string(argv[3]) != "-c" && string(argv[3]) != "-d"))
    {
        cout<<"usage: cram.exe file_to_compress compressed_file (-c)compress/(-d)ecompress";
        return -1;
    }
 
-   if(argv[3] == "-c") //compress
+   if(string(argv[3]) == "-c") //compress
    {
    filename = argv[1];
    out_filename = argv[2];
@@ -104,12 +103,10 @@ int main(int argc, char* argv[])
     ofstream out(out_filename, ios::out | ios::binary);
     out.write(&output[0],output.size());
 
-
    }
 
-   if(argv[3]=="-d") //decompress
+   if(string(argv[3])=="-d") //decompress
    {
-
    filename = argv[1];
    out_filename = argv[2];
 
@@ -118,65 +115,77 @@ int main(int argc, char* argv[])
    }
    catch(exception& e) {cerr<<e.what();}
 
-
    int last_bits = (int)file_contents[0]; // # of valid bits in last message byte
    int tree_bits = (int)file_contents[1]; // # of bits in tree
-   int msg_idx = 2 + ceil(tree_bits/8);
+   int msg_idx = 3 + tree_bits/8; //3 instead of 2 bc truncates
    vector<bool> encoded_msg = extract_msg(file_contents, msg_idx, last_bits);
 
+
    //build huffman tree of original message
-   vector<bool> encoded_hufftree;
+   vector<bool> encoded_hufftree = extract_tree(file_contents, tree_bits);
+
    vector<huffnode*> hufftree;
+   huffnode* root;
    for(int i=0; i<encoded_hufftree.size(); ++i)
    {
        if(encoded_hufftree[i]==0)
        {
-         //  int last_idx = (hufftree.size()==0) ? 0 : hufftree.size()-1;
            bool ok=false;
-           huffnode* node = new huffnode(char(0), 0, nullptr, nullptr); //don't care about arg2, freq
+           huffnode* node = new huffnode(char(0), 0, nullptr, nullptr); //don't care about arg2 (freq)
 
            while(!ok)
            {
-            int last_idx = (hufftree.size()==0) ? 0 : hufftree.size()-1;
+            int last_idx = (hufftree.size()==0) ? -1 : hufftree.size()-1;
+            if(last_idx!= -1)
+            {
             huffnode* last_node = hufftree[last_idx];
 
            if(last_node->left==nullptr)
             {last_node->left=node; ok=true;}
-           else if(last_node->right==nullptr)
+           else if(last_node->left!=nullptr && last_node->right==nullptr)
             {last_node->right=node; ok=true;}
            else
                hufftree.pop_back();
            }
-
+            if(hufftree.size()==0) break; //edge case
+           }
+            if(i==0) root = node;
            hufftree.push_back(node);
        }
 
        if(encoded_hufftree[i]==1) //TODO DRY
        {
-          // int last_idx = (hufftree.size()==0) ? 0 : hufftree.size()-1;
+
            bool ok=false;
-           huffnode* node = new huffnode(pack_bools(encoded_hufftree, i), 0, nullptr, nullptr);
+           char c = pack_bools(encoded_hufftree, i+1);
+           huffnode* node = new huffnode(c, 0, nullptr, nullptr);
 
            while(!ok)
            {
-            int last_idx = (hufftree.size()==0) ? 0 : hufftree.size()-1;
+            int last_idx = (hufftree.size()==0) ? -1 : hufftree.size()-1;
+             if(last_idx!= -1)
+            {
             huffnode* last_node = hufftree[last_idx];
 
            if(last_node->left==nullptr)
             {last_node->left=node; ok=true;}
-           else if(last_node->right==nullptr)
+           else if(last_node->left!=nullptr && last_node->right==nullptr)
             {last_node->right=node; ok=true;}
            else
                hufftree.pop_back();
            }
+        //   if(hufftree.size()==0) break; //edge case
+           }
+           if(i==0) root = node;
+           i+=8;
        }
    }
 
-   vector<char> decoded_msg = decode(encoded_msg, hufftree[0]);
+   vector<char> decoded_msg = decode(encoded_msg, root);
+
    ofstream out(out_filename, ios::out | ios::binary);
    out.write(&decoded_msg[0],decoded_msg.size());
    }
-
 
 
     return 0;

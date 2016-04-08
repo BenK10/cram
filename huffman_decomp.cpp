@@ -1,4 +1,4 @@
-#include <cmath>
+
 #include <vector>
 #include "io.h"
 #include "huffnode.h"
@@ -7,10 +7,10 @@
 std::vector<bool> extract_tree(std::vector<char>& contents, int tree_bits)
 {
     std::vector<bool> tree;
-    int bytes = ceil(tree_bits/8);
+    int bytes = tree_bits/8 + 1;
     for(int i=0; i<bytes; ++i)
     {
-        std::vector<bool> bits = char_to_bools(contents[i]);
+        std::vector<bool> bits = char_to_bools(contents[i+2]); //1st 2 bytes are header
         for(bool b : bits)
             tree.push_back(b);
     }
@@ -43,18 +43,21 @@ std::vector<bool> extract_msg(std::vector<char>& contents, int msg_idx, int msg_
 //use tree to decode message
 std::vector<char> decode(std::vector<bool>& msg, huffnode* tree)
 {
-    std::vector<char> decoded_msg;
+     std::vector<char> decoded_msg;
+
+    if(tree==nullptr)
+        return decoded_msg;
+
     huffnode* root = tree;
     for(int i=0; i<msg.size(); ++i)
     {
-        tree = root; //reset
-
         if(msg[i]==0)
             tree=tree->left;
         if(msg[i]==1)
             tree=tree->right;
-        if(tree!=nullptr && tree->data!=0)
-            {decoded_msg.push_back(tree->data); i+=8;}
+        if(tree!=nullptr && tree->data!=(char)0)
+            {decoded_msg.push_back(tree->data); tree = root;} //reset
     }
+
     return decoded_msg;
 }

@@ -2,6 +2,7 @@
 #include <fstream>
 #include <exception>
 #include <algorithm>
+#include <iostream> //TODO remove
 
 //"insane_coder"'s binary file read, benchmarked to be the fastest way
 //see http://insanecoding.blogspot.it/2011/11/how-to-read-in-file-in-c.html
@@ -39,10 +40,12 @@ char pack_bools(std::vector<bool>& bits, int index)
 {
     char result = (char)0;
     char mask = (char)1;
-    for(int i=index; i<index+8; ++i)
+
+    for(int i=0; i<8; ++i)
     {
-        result = result | ((char)bits[i] & mask);
+        result = result | ((char)bits[i+index] & mask);
         if( (i+1)%8 != 0) result <<= 1; //don't shift if at end of byte
     }
+
     return result;
 }
